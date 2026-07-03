@@ -1,4 +1,10 @@
+# secrets — never commit
+.groqkey
+.env
+
+# local state
+.theme
+
+# python
 __pycache__/
 *.pyc
-.env
-*.wav

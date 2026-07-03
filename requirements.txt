@@ -3,3 +3,4 @@ soundfile
 numpy
 requests
 pyperclip
+pillow

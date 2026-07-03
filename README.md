@@ -1,42 +1,38 @@
 # WinVoCode
 
-A tiny **Winamp-styled voice-to-clipboard** tool for Windows. Click ⏺, talk, click ⏹ —
-your speech is transcribed by [Groq Whisper](https://console.groq.com/) and dropped on your
-clipboard. Paste anywhere with Ctrl+V.
+A tiny voice-to-clipboard recorder for Windows. Click, talk, click again — your
+speech is transcribed by [Groq Whisper](https://console.groq.com) and copied
+straight to the clipboard, ready to paste with `Ctrl+V`.
 
-Built live on YouTube with Claude Code (and Fable 5) as a total-beginner "zero → real app"
-walkthrough. One file, ~5 dependencies, one free API key.
+Three switchable looks (toggle with the **⇄** button, it remembers your choice):
 
-## What it does
+- **Winamp** — a classic 2.x skin with an LCD clock and spectrum analyzer.
+- **Pill** — a minimal dark WhisperFlow-style pill: talk-timer, centered voice
+  bars, one button (click to start, click again to stop + transcribe).
+- **Pill-Light** — the same pill in a light/cream palette.
 
-1. **⏺ REC** captures your microphone (16 kHz mono).
-2. **⏹ STOP** encodes the audio, sends it to Groq Whisper (`whisper-large-v3-turbo`), and
-   copies the transcript to your clipboard.
-3. A scrolling LCD marquee, elapsed-time display, and a 19-bar spectrum analyzer give it the
-   classic Winamp 2.x look.
+The pills use a per-pixel-alpha layered window for genuinely smooth, anti-aliased
+rounded corners (falls back to a plain canvas pill if that path is unavailable).
 
-## Setup (Windows)
+## Setup
 
-```powershell
-# 1. install the dependencies
-pip install -r requirements.txt
-
-# 2. get a FREE key at https://console.groq.com/keys , then:
-setx GROQ_API_KEY "gsk_your_key_here"
-#    (reopen the terminal so the variable is picked up)
-
-# 3. run it
+```bash
+pip install sounddevice soundfile pyperclip requests numpy pillow
 python winvocode.py
 ```
 
-The key is read **only** from the `GROQ_API_KEY` environment variable — never hardcoded,
-never logged.
+## Groq API key
 
-## Files
+You need a Groq API key (free at https://console.groq.com/keys). Two ways to add it:
 
-- `winvocode.py` — the whole app, single file.
-- `SPEC.md` — the design spec it was built from.
+1. **Environment variable** — `set GROQ_API_KEY=gsk_...` before launching, or
+2. **In-app** — just click record the first time and paste your key into the
+   prompt. It's saved locally to `.groqkey` (which is git-ignored, never committed).
 
-## License
+## Usage
 
-MIT
+- **Record**: click ⏺ (Winamp) or click the pill. Click again (⏹ / the pill) to
+  stop; the transcript lands on your clipboard.
+- **Switch theme**: the ⇄ button.
+- **Move the window**: drag the title bar (Winamp) or drag the pill.
+- **Pick a mic**: the MIC dropdown in the Winamp skin.
