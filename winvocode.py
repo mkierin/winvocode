@@ -680,6 +680,7 @@ class WinVoCode:
             pass
         self.stream = None
         self.latest = None
+        self.rec_ticks = 0
         self.busy = True
         self.status = "TRANSCRIBING"
         self._sync_ui()
