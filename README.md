@@ -36,3 +36,19 @@ You need a Groq API key (free at https://console.groq.com/keys). Two ways to add
 - **Switch theme**: the ⇄ button.
 - **Move the window**: drag the title bar (Winamp) or drag the pill.
 - **Pick a mic**: the MIC dropdown in the Winamp skin.
+
+## Rebuild it from the recipe (the interesting part)
+
+This repo ships its own **spec recipe**: [`RECIPE.md`](RECIPE.md) — a distilled,
+phase-ordered spec that a fresh AI agent can rebuild this entire app from,
+without ever seeing this code. Paste the file into Claude Code and say
+*"build this"*.
+
+It was created with [spec2prod](https://github.com/mkierin/spec2prod)
+(spec capture + spec distill) from the real build sessions, and it is
+**cold-build verified**: a fresh agent with no context and no access to this
+repo rebuilt all 6 files with 51/51 named functions and classes matching, and
+independently re-derived the Groq API contract from the live docs.
+
+The thesis: your prompts are the source code — stop throwing them away.
+Don't just clone the app. Rebuild it, restyle it, make it yours.
