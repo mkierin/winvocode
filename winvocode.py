@@ -32,6 +32,7 @@ GROQ_MODEL = "whisper-large-v3-turbo"
 
 THEME_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".theme")
 KEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".groqkey")
+MIC_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".mic")
 
 
 def get_key():
@@ -50,6 +51,22 @@ def save_key(k):
     try:
         with open(KEY_FILE, "w") as f:
             f.write(k.strip())
+    except Exception:
+        pass
+
+
+def load_mic():
+    """Saved default input-device index, or None if unset/invalid."""
+    try:
+        return int(open(MIC_FILE).read().strip())
+    except Exception:
+        return None
+
+
+def save_mic(idx):
+    try:
+        with open(MIC_FILE, "w") as f:
+            f.write(str(idx))
     except Exception:
         pass
 
@@ -295,6 +312,8 @@ class WinVoCode:
                 self.root.unbind(seq)
         self._ctl_hits = []
         for w in self.root.winfo_children():
+            if isinstance(w, tk.Toplevel):   # keep the settings panel alive across rebuilds
+                continue
             w.destroy()
 
         if self.theme.startswith("pill"):
@@ -305,6 +324,9 @@ class WinVoCode:
                 self.root.wm_attributes("-transparentcolor", "")
             except Exception:
                 pass
+            # clear any fixed size left by the pill theme so winamp
+            # shrink-wraps to its own content instead of staying 256x60
+            self.root.geometry("")
             self.root.configure(bg="#0e0e18")
             self._build_winamp()
             self._recenter()
@@ -312,7 +334,8 @@ class WinVoCode:
 
     def _recenter(self):
         self.root.update_idletasks()
-        w, h = self.root.winfo_width(), self.root.winfo_height()
+        w = self.root.winfo_reqwidth()
+        h = self.root.winfo_reqheight()
         x = (self.root.winfo_screenwidth() - w) // 2
         y = (self.root.winfo_screenheight() - h) // 3
         self.root.geometry(f"+{x}+{y}")
@@ -360,41 +383,41 @@ class WinVoCode:
                          fg=GOLD, bg=STEEL_D, cursor="hand2", padx=6)
         close.pack(side="right")
         close.bind("<Button-1>", lambda e: self._quit())
-        swap = tk.Label(tb, text="⇄", font=("Consolas", 9, "bold"),
+        gear = tk.Label(tb, text="⚙", font=("Consolas", 9, "bold"),
                         fg=GOLD, bg=STEEL_D, cursor="hand2", padx=4)
-        swap.pack(side="right")
-        swap.bind("<Button-1>", lambda e: self.switch_theme())
+        gear.pack(side="right")
+        gear.bind("<Button-1>", lambda e: self._open_settings())
         for w in (tb, title):
             w.bind("<Button-1>", self._drag_start)
             w.bind("<B1-Motion>", self._drag_move)
 
     def _winamp_lcd(self, parent):
         lcd = tk.Frame(parent, bg=LCD_BG, bd=2, relief="sunken")
-        lcd.pack(fill="x", padx=6, pady=(0, 4))
+        lcd.pack(fill="x", padx=4, pady=(0, 3))
         top = tk.Frame(lcd, bg=LCD_BG)
-        top.pack(fill="x", padx=6, pady=(6, 0))
-        self.dot = tk.Label(top, text=" ", font=("Consolas", 16, "bold"), fg=RED, bg=LCD_BG)
+        top.pack(fill="x", padx=5, pady=(3, 0))
+        self.dot = tk.Label(top, text=" ", font=("Consolas", 11, "bold"), fg=RED, bg=LCD_BG)
         self.dot.pack(side="left")
-        self.time = tk.Label(top, text="00:00", font=("Consolas", 22, "bold"),
+        self.time = tk.Label(top, text="00:00", font=("Consolas", 15, "bold"),
                              fg=LCD_GRN, bg=LCD_BG)
-        self.time.pack(side="left", padx=(2, 10))
+        self.time.pack(side="left", padx=(1, 8))
         ind = tk.Frame(top, bg=LCD_BG)
         ind.pack(side="right")
-        tk.Label(ind, text="16KHZ", font=("Consolas", 8, "bold"), fg=LCD_GRN, bg=LCD_BG).pack(anchor="e")
-        tk.Label(ind, text="MONO", font=("Consolas", 8, "bold"), fg=LCD_GRN, bg=LCD_BG).pack(anchor="e")
-        self.status_lbl = tk.Label(lcd, text="", font=("Consolas", 10, "bold"),
-                                   fg=LCD_GRN, bg=LCD_BG, anchor="w", width=34)
-        self.status_lbl.pack(fill="x", padx=6, pady=(2, 4))
-        self.W, self.H = 300, 72
+        tk.Label(ind, text="16KHZ", font=("Consolas", 7, "bold"), fg=LCD_GRN, bg=LCD_BG).pack(anchor="e")
+        tk.Label(ind, text="MONO", font=("Consolas", 7, "bold"), fg=LCD_GRN, bg=LCD_BG).pack(anchor="e")
+        self.status_lbl = tk.Label(lcd, text="", font=("Consolas", 8, "bold"),
+                                   fg=LCD_GRN, bg=LCD_BG, anchor="w", width=32)
+        self.status_lbl.pack(fill="x", padx=5, pady=(1, 2))
+        self.W, self.H = 228, 30
         self.canvas = tk.Canvas(lcd, width=self.W, height=self.H, bg=LCD_BG, highlightthickness=0)
-        self.canvas.pack(padx=6, pady=(0, 6))
+        self.canvas.pack(padx=5, pady=(0, 4))
         self._init_winamp_bars()
 
     def _init_winamp_bars(self):
         self.rects = []
-        gap = 4
+        gap = 2
         bw = (self.W - gap * (N_BARS + 1)) / N_BARS
-        sh = (self.H - 6) / N_SEG
+        sh = (self.H - 4) / N_SEG
         for b in range(N_BARS):
             x0 = gap + b * (bw + gap)
             col = []
@@ -410,30 +433,30 @@ class WinVoCode:
 
     def _winamp_mic(self, parent):
         row = tk.Frame(parent, bg=STEEL)
-        row.pack(fill="x", padx=6, pady=(0, 4))
-        tk.Label(row, text="MIC", font=("Consolas", 8, "bold"), fg=GOLD, bg=STEEL).pack(side="left", padx=(2, 6))
+        row.pack(fill="x", padx=4, pady=(0, 3))
+        tk.Label(row, text="MIC", font=("Consolas", 7, "bold"), fg=GOLD, bg=STEEL).pack(side="left", padx=(2, 5))
         labels = list(self.mic_map.keys()) or ["(default)"]
         cur = next((l for l, i in self.mic_map.items() if i == self.device), labels[0])
         self.mic_var = tk.StringVar(value=cur)
         self.mic_menu = tk.OptionMenu(row, self.mic_var, *labels, command=self._on_mic_change)
-        self.mic_menu.config(font=("Consolas", 8), fg=LCD_GRN, bg=STEEL_D,
+        self.mic_menu.config(font=("Consolas", 7), fg=LCD_GRN, bg=STEEL_D,
                              activebackground="#2e2e4a", activeforeground=GOLD,
                              highlightthickness=0, bd=1, relief="raised", anchor="w")
-        self.mic_menu["menu"].config(font=("Consolas", 8), fg=LCD_GRN, bg=STEEL_D,
+        self.mic_menu["menu"].config(font=("Consolas", 7), fg=LCD_GRN, bg=STEEL_D,
                                      activebackground="#2e2e4a", activeforeground=GOLD)
         self.mic_menu.pack(side="left", fill="x", expand=True)
 
     def _winamp_transport(self, parent):
         bar = tk.Frame(parent, bg=STEEL)
-        bar.pack(pady=(2, 8))
-        style = dict(font=("Consolas", 13, "bold"), width=6, bd=3,
+        bar.pack(pady=(1, 6))
+        style = dict(font=("Consolas", 11, "bold"), width=4, bd=2,
                      relief="raised", bg=STEEL_D, activebackground="#2e2e4a")
         self.btn_rec = tk.Button(bar, text="⏺", fg=RED, activeforeground=RED,
                                  command=self.start, **style)
-        self.btn_rec.pack(side="left", padx=3)
+        self.btn_rec.pack(side="left", padx=2)
         self.btn_stop = tk.Button(bar, text="⏹", fg=LCD_GRN, activeforeground=LCD_GRN,
                                   state="disabled", command=self.stop, **style)
-        self.btn_stop.pack(side="left", padx=3)
+        self.btn_stop.pack(side="left", padx=2)
 
     def _on_mic_change(self, label):
         self.device = self.mic_map.get(label)
@@ -450,9 +473,9 @@ class WinVoCode:
         self._pill_step = (self._pill_x1 - self._pill_x0) / (PILL_N_BARS - 1)
         self._pill_yc = self.PH / 2
         cx = self.PW - 22
-        # control hit boxes in window coords: ✕ top, ⇄ bottom
+        # control hit boxes in window coords: ✕ top, ⚙ bottom (settings)
         self._ctl_hits = [(cx - 11, 9, cx + 11, 31, self._quit),
-                          (cx - 11, self.PH - 31, cx + 11, self.PH - 9, self.switch_theme)]
+                          (cx - 11, self.PH - 31, cx + 11, self.PH - 9, self._open_settings)]
 
         # try the smooth layered-window path first
         if _WIN32_OK and _PIL_OK:
@@ -511,7 +534,7 @@ class WinVoCode:
     def _canvas_ctl(self, x0, y0, x1, y1, cmd):
         pal = self.pal
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
-        glyph = "✕" if cmd == self._quit else "⇄"
+        glyph = "✕" if cmd == self._quit else "⚙"
         tag = f"ctl{int(cy)}"
         self.canvas.create_rectangle(x0, y0, x1, y1, fill=pal["bg"], outline="", tags=tag)
         self.canvas.create_text(cx, cy, text=glyph, font=("Consolas", 9, "bold"),
@@ -584,7 +607,7 @@ class WinVoCode:
         if self._f_ctl:
             cx = (self.PW - 22) * SS
             d.text((cx, 20 * SS), "✕", font=self._f_ctl, fill=_hex(pal["dim"]) + (255,), anchor="mm")
-            d.text((cx, (self.PH - 20) * SS), "⇄", font=self._f_ctl, fill=_hex(pal["dim"]) + (255,), anchor="mm")
+            d.text((cx, (self.PH - 20) * SS), "⚙", font=self._f_ctl, fill=_hex(pal["dim"]) + (255,), anchor="mm")
 
         img = img.resize((self.PW, self.PH), Image.LANCZOS)
         arr = np.asarray(img).astype(np.uint16)
@@ -607,6 +630,10 @@ class WinVoCode:
         return out
 
     def _pick_default_device(self):
+        saved = load_mic()
+        if saved is not None and saved in self.mic_map.values():
+            self.device = saved
+            return
         try:
             self.device = sd.default.device[0]
         except Exception:
@@ -666,6 +693,114 @@ class WinVoCode:
         ent.bind("<Return>", lambda e: do_save())
         win.update_idletasks()
         win.geometry(f"+{self.root.winfo_x()}+{self.root.winfo_y() + 72}")
+
+    def _open_settings(self):
+        """Settings panel: theme, default mic, API key. Winamp-styled, theme-agnostic."""
+        if getattr(self, "_settings_win", None) is not None:
+            try:
+                self._settings_win.lift()
+                self._settings_win.focus_force()
+                return
+            except Exception:
+                self._settings_win = None
+
+        win = tk.Toplevel(self.root)
+        self._settings_win = win
+        win.title("WinVoCode Settings")
+        win.configure(bg=STEEL, bd=2)
+        win.attributes("-topmost", True)
+        win.resizable(False, False)
+
+        def _close():
+            self._settings_win = None
+            win.destroy()
+        win.protocol("WM_DELETE_WINDOW", _close)
+
+        def section(text):
+            tk.Label(win, text=text, bg=STEEL, fg=GOLD, anchor="w",
+                     font=("Consolas", 9, "bold")).pack(fill="x", padx=14, pady=(12, 2))
+
+        # ---- theme ----
+        section("THEME")
+        theme_var = tk.StringVar(value=self.theme)
+
+        def apply_theme():
+            t = theme_var.get()
+            if t in THEMES and t != self.theme:
+                self.theme = t
+                save_theme(t)
+                self._build()
+            try:
+                win.lift(); win.focus_force()
+            except Exception:
+                pass
+
+        trow = tk.Frame(win, bg=STEEL)
+        trow.pack(fill="x", padx=14)
+        for t in THEMES:
+            tk.Radiobutton(trow, text=t, variable=theme_var, value=t, command=apply_theme,
+                           bg=STEEL, fg=LCD_GRN, selectcolor=STEEL_D, activebackground=STEEL,
+                           activeforeground=GOLD, font=("Consolas", 9),
+                           highlightthickness=0, anchor="w").pack(side="left", padx=(0, 8))
+
+        # ---- default mic ----
+        section("DEFAULT MIC")
+        labels = list(self.mic_map.keys()) or ["(default)"]
+        cur = next((l for l, i in self.mic_map.items() if i == self.device), labels[0])
+        mic_var = tk.StringVar(value=cur)
+
+        def apply_mic(label):
+            idx = self.mic_map.get(label)
+            self.device = idx
+            if idx is not None:
+                save_mic(idx)
+            if self.theme == "winamp" and hasattr(self, "mic_var"):
+                try:
+                    self.mic_var.set(label)
+                except Exception:
+                    pass
+
+        mic_menu = tk.OptionMenu(win, mic_var, *labels, command=apply_mic)
+        mic_menu.config(font=("Consolas", 9), fg=LCD_GRN, bg=STEEL_D, anchor="w",
+                        activebackground="#2e2e4a", activeforeground=GOLD,
+                        highlightthickness=0, bd=1, relief="raised")
+        mic_menu["menu"].config(font=("Consolas", 9), fg=LCD_GRN, bg=STEEL_D,
+                                activebackground="#2e2e4a", activeforeground=GOLD)
+        mic_menu.pack(fill="x", padx=14, pady=(0, 2))
+        tk.Label(win, text="saved as default — used on next launch", bg=STEEL, fg="#9a988c",
+                 font=("Consolas", 8)).pack(anchor="w", padx=14)
+
+        # ---- api key ----
+        section("GROQ API KEY")
+        has_env = bool(os.environ.get("GROQ_API_KEY", "").strip())
+        key_var = tk.StringVar()
+        ent = tk.Entry(win, textvariable=key_var, show="•", width=40, font=("Consolas", 10),
+                       bg=STEEL_D, fg=LCD_GRN, insertbackground=LCD_GRN, relief="sunken", bd=2)
+        ent.pack(fill="x", padx=14, pady=(0, 2))
+        key_note = tk.Label(win, bg=STEEL, fg="#9a988c", font=("Consolas", 8),
+                            text=("env GROQ_API_KEY is set (overrides saved key)" if has_env
+                                  else "free key at console.groq.com/keys"))
+        key_note.pack(anchor="w", padx=14)
+
+        def save_key_click():
+            k = key_var.get().strip()
+            if k:
+                save_key(k)
+                key_var.set("")
+                key_note.config(text="key saved ✓", fg=LCD_GRN)
+
+        krow = tk.Frame(win, bg=STEEL)
+        krow.pack(fill="x", padx=14, pady=(4, 2))
+        bstyle = dict(font=("Consolas", 9, "bold"), bg=STEEL_D, fg=GOLD,
+                      activebackground="#2e2e4a", bd=2)
+        tk.Button(krow, text="Save Key", command=save_key_click, width=10, **bstyle).pack(side="left")
+        ent.bind("<Return>", lambda e: save_key_click())
+
+        tk.Button(win, text="Close", command=_close, width=10, **bstyle).pack(pady=(10, 14))
+
+        win.update_idletasks()
+        win.geometry(f"+{self.root.winfo_x()}+{self.root.winfo_y() + 40}")
+        ent.focus_set()
 
     def _on_audio(self, indata, frames, time_info, status):
         self.frames.append(indata.copy())
